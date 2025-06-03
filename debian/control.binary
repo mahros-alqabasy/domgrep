@@ -1,0 +1,14 @@
+Source: domgrep
+Section: utils
+Priority: optional
+Maintainer: Mahros AL-Qabasy <mahros.elqabasy@gmail.com>
+Build-Depends: debhelper (>= 9)
+Standards-Version: 4.5.0
+Homepage: https://github.com/yourusername/domgrep
+# Version: (this line will be replaced dynamically in the workflow)
+
+Package: domgrep
+Architecture: all
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Lightweight domain grep utility
+ A simple and efficient command-line tool for searching domain patterns using regex and plain text.

@@ -1,19 +1,13 @@
-
-
-
 Source: domgrep
 Section: utils
 Priority: optional
-Maintainer: Mahros Al-Qabasy mahros.elqabasy@gmail.com
+Maintainer: Mahros Al-Qabasy <mahros.elqabasy@gmail.com>
 Build-Depends: debhelper (>= 11)
-Standards-Version: 4.5.1
+Standards-Version: 4.5.0
 Homepage: https://github.com/mahros-alqabasy/domgrep
 
 Package: domgrep
-Version: __VERSION__
-Architecture: all
-Depends: ${misc:Depends}
-Description: Lightweight domain search tool using plain text or regex
- A modular command-line tool for filtering domain names from input streams
- or files. Built in pure Bash with support for regex or plain search,
- useful for OSINT, scraping, or filtering URLs.
+Architecture: amd64
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: A Linux domain grep tool for regex and plain text domain search.
+ A professional Linux tool to grep domains using regex or text patterns.
