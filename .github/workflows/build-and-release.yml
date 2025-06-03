@@ -8,14 +8,18 @@ on:
 permissions:
   contents: write
 
+env:
+  PACKAGE_NAME: domgrep
+  DEB_ARCH: amd64
+
 jobs:
-  build-and-release:
-    name: Build and Release .deb Package
+  build:
+    name: Build .deb Package
     runs-on: ubuntu-latest
 
-    env:
-      DEB_ARCH: amd64  # Set architecture explicitly
-      PACKAGE_NAME: domgrep
+    outputs:
+      deb_version: ${{ steps.version.outputs.version }}
+      deb_file: ${{ steps.package.outputs.deb_file }}
 
     steps:
       - name: Checkout repository
@@ -40,7 +44,6 @@ jobs:
         id: version
         run: echo "version=$(cat VERSION)" >> $GITHUB_OUTPUT
 
-      # -------------------- Build Step --------------------
       - name: Prepare package structure
         run: |
           mkdir -p pkg/DEBIAN
@@ -49,53 +52,57 @@ jobs:
           mkdir -p pkg/usr/share/man/man1
           mkdir -p pkg/usr/share/doc/${{ env.PACKAGE_NAME }}
 
-          # Control and postinst
           cp debian/control pkg/DEBIAN/control
           cp debian/postinst pkg/DEBIAN/postinst
           chmod 755 pkg/DEBIAN/postinst
 
-          # Shell scripts
           cp src/*.sh pkg/usr/lib/${{ env.PACKAGE_NAME }}/
-
-          # Man page
           cp man/${{ env.PACKAGE_NAME }}.1 pkg/usr/share/man/man1/
           gzip -9 -f pkg/usr/share/man/man1/${{ env.PACKAGE_NAME }}.1
 
-          # Documentation
           cp README.md pkg/usr/share/doc/${{ env.PACKAGE_NAME }}/
           cp debian/changelog pkg/usr/share/doc/${{ env.PACKAGE_NAME }}/
           cp debian/copyright pkg/usr/share/doc/${{ env.PACKAGE_NAME }}/
           gzip -9 -f pkg/usr/share/doc/${{ env.PACKAGE_NAME }}/changelog
 
-          # Entry point
           echo '#!/bin/sh' > pkg/usr/bin/${{ env.PACKAGE_NAME }}
           echo "exec /usr/lib/${{ env.PACKAGE_NAME }}/${{ env.PACKAGE_NAME }}.sh \"\$@\"" >> pkg/usr/bin/${{ env.PACKAGE_NAME }}
           chmod +x pkg/usr/bin/${{ env.PACKAGE_NAME }}
 
-          # Fix ownership
           sudo chown -R root:root pkg/
 
       - name: Build .deb package
+        id: package
         run: |
-          export DEB_VERSION=${{ steps.version.outputs.version }}
-          export DEB_FILE="${{ env.PACKAGE_NAME }}_${DEB_VERSION}_${{ env.DEB_ARCH }}.deb"
+          DEB_VERSION="${{ steps.version.outputs.version }}"
+          DEB_FILE="${{ env.PACKAGE_NAME }}_${DEB_VERSION}_${{ env.DEB_ARCH }}.deb"
           dpkg-deb --build pkg "$DEB_FILE"
-          echo "deb_file=$DEB_FILE" >> $GITHUB_ENV
+          echo "deb_file=$DEB_FILE" >> $GITHUB_OUTPUT
 
       - name: Upload .deb artifact
         uses: actions/upload-artifact@v4
         with:
-          name: domgrep-deb
-          path: ${{ env.deb_file }}
+          name: ${{ env.PACKAGE_NAME }}-deb
+          path: ${{ steps.package.outputs.deb_file }}
 
-      # -------------------- Release Step --------------------
+  release:
+    name: Release Package
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - name: Download .deb artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.PACKAGE_NAME }}-deb
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: "v${{ steps.version.outputs.version }}"
-          release_name: "domgrep v${{ steps.version.outputs.version }}"
-          body: "Automated release for domgrep version v${{ steps.version.outputs.version }}"
-          files: "${{ env.deb_file }}"
+          tag_name: "v${{ needs.build.outputs.deb_version }}"
+          release_name: "domgrep v${{ needs.build.outputs.deb_version }}"
+          body: "Automated release for domgrep version v${{ needs.build.outputs.deb_version }}"
+          files: "${{ needs.build.outputs.deb_file }}"
           draft: false
           prerelease: false
           overwrite: true
