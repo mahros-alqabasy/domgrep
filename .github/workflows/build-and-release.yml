@@ -1,9 +1,8 @@
-name: Build and Release .deb Package
+name: Build and Release domgrep
 
 on:
   push:
-    tags:
-      - "v*.*.*"
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -11,23 +10,31 @@ permissions:
 
 jobs:
   build-deb:
-    name: Build Debian Package
+    name: Build and Release .deb Package
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Repository
+      - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Extract version from tag
-        id: get_version
+      - name: Set up Git user (required for commit)
         run: |
-          echo "TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
-          echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_ENV
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
       - name: Install dependencies
         run: |
           sudo apt update
-          sudo apt install -y dpkg-dev debhelper fakeroot gzip
+          sudo apt install -y dpkg-dev debhelper fakeroot
+
+      - name: Bump version (patch by default)
+        run: |
+          chmod +x scripts/bump_version.sh
+          ./scripts/bump_version.sh patch
+
+      - name: Read new version
+        id: version
+        run: echo "version=$(cat VERSION)" >> $GITHUB_OUTPUT
 
       - name: Prepare Package Structure
         run: |
@@ -36,61 +43,30 @@ jobs:
           mkdir -p pkg/usr/share/man/man1
           mkdir -p pkg/usr/share/doc/domgrep
 
-          # Copy control and postinst files
           cp debian/control pkg/DEBIAN/control
-          cp debian/postinst pkg/DEBIAN/postinst
-          chmod 755 pkg/DEBIAN/postinst
-
-          # Copy scripts to /usr/bin
           cp src/*.sh pkg/usr/bin/
-          chmod +x pkg/usr/bin/*.sh
-
-          # Rename domgrep.sh to domgrep as main executable
-          mv pkg/usr/bin/domgrep.sh pkg/usr/bin/domgrep
-
-          # Copy man page and compress it
           cp man/domgrep.1 pkg/usr/share/man/man1/
           gzip -f pkg/usr/share/man/man1/domgrep.1
-
-          # Copy README or docs
-          cp README.md pkg/usr/share/doc/domgrep/README.md
+          cp debian/postinst pkg/DEBIAN/postinst
+          chmod 755 pkg/DEBIAN/postinst
+          cp README.md pkg/usr/share/doc/domgrep/
 
       - name: Build .deb package
-        run: |
-          dpkg-deb --build pkg domgrep_${{ env.VERSION }}.deb
+        run: dpkg-deb --build pkg "domgrep_${{ steps.version.outputs.version }}.deb"
 
       - name: Upload Debian package artifact
         uses: actions/upload-artifact@v4
         with:
           name: domgrep-deb
-          path: domgrep_${{ env.VERSION }}.deb
-
-  release:
-    name: Create GitHub Release
-    needs: build-deb
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-
-      - name: Extract version from tag
-        run: |
-          echo "TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
-          echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_ENV
-
-      - name: Download Debian package artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: domgrep-deb
+          path: "domgrep_${{ steps.version.outputs.version }}.deb"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: ${{ env.TAG }}
-          name: "Release ${{ env.TAG }}"
-          files: domgrep_${{ env.VERSION }}.deb
-          body: "New release of domgrep CLI tool: version ${{ env.VERSION }}"
+          tag_name: "v${{ steps.version.outputs.version }}"
+          release_name: "domgrep v${{ steps.version.outputs.version }}"
+          body: "Automated release for domgrep version v${{ steps.version.outputs.version }}"
+          files: "domgrep_${{ steps.version.outputs.version }}.deb"
           draft: false
           prerelease: false
           overwrite: true
