@@ -85,7 +85,7 @@ jobs:
           tag_name: "v${{ steps.version.outputs.version }}"
           release_name: "domgrep v${{ steps.version.outputs.version }}"
           body: "Automated release for domgrep version v${{ steps.version.outputs.version }}"
-          files: "domgrep.deb"
+          files: "domgrep_${{ steps.version.outputs.version }}.deb"
           draft: false
           prerelease: false
           overwrite: true
