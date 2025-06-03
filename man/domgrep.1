@@ -1,0 +1,57 @@
+.\" domgrep.1 - Manual page for domgrep
+.TH DOMGREP 1 "June 2025" "domgrep 1.0.0" "User Commands"
+.SH NAME
+domgrep \- search for domain names using plain text or regular expressions
+.SH SYNOPSIS
+.B domgrep
+[\fIOPTIONS\fR] \fIPATTERN\fR [FILE]
+.SH DESCRIPTION
+\fBdomgrep\fR is a lightweight command-line tool written in POSIX-compliant shell that searches for domain-like patterns from standard input or files. It supports both plain text and extended regular expression (ERE) matching.
+
+It is especially useful in security research, asset discovery, scraping, or filtering logs where domain patterns need to be identified or matched efficiently.
+
+.SH OPTIONS
+.TP
+\fB-r\fR, \fB--regex\fR
+Treat the given pattern as a regular expression (ERE).
+.TP
+\fB-f\fR \fIFILE\fR, \fB--file\fR \fIFILE\fR
+Read input from a file instead of standard input.
+.TP
+\fB-h\fR, \fB--help\fR
+Display help and usage information.
+.TP
+\fB-v\fR, \fB--version\fR
+Display version information.
+
+.SH EXAMPLES
+.TP
+Scan a text file for domains matching plain text:
+.B
+domgrep "docs.google.com" -f urls.txt
+.TP
+Search for any subdomain under docs.* using regex:
+.B
+cat urls.txt | domgrep -r "docs\\.[a-z]+\\.[a-z]+"
+
+.SH EXIT STATUS
+.TP
+0
+Pattern was found in the input.
+.TP
+1
+Pattern was not found.
+.TP
+2
+An error occurred (invalid input, file not found, etc).
+
+.SH AUTHOR
+Mahros Al-Qabasy
+
+.SH LICENSE
+MIT License. See the LICENSE file in the source repository.
+
+.SH SEE ALSO
+.B grep(1),
+.B awk(1),
+.B sed(1)

@@ -1,0 +1,12 @@
+Package: domgrep
+Version: 1.0.0
+Architecture: all
+Maintainer: Mahros Al-Qabasy mahros.elqabasy@gmail.com
+Installed-Size: 13
+Section: utils
+Priority: optional
+Homepage: https://github.com/mahros-alqabasy/domgrep
+Description: Lightweight domain search tool using plain text or regex
+ A modular command-line tool for filtering domain names from input streams
+ or files. Built in pure Bash with support for regex or plain search,
+ useful for OSINT, scraping, or filtering URLs.
