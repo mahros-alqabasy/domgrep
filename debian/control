@@ -1,13 +1,8 @@
-Source: domgrep
+Package: domgrep
+Version: 1.0.0
 Section: utils
 Priority: optional
-Maintainer: Mahros Al-Qabasy <mahros.elqabasy@gmail.com>
-Build-Depends: debhelper (>= 11)
-Standards-Version: 4.5.0
-Homepage: https://github.com/mahros-alqabasy/domgrep
-
-Package: domgrep
-Architecture: amd64
-Depends: ${shlibs:Depends}, ${misc:Depends}
+Architecture: all
+Maintainer: Mahros mahros.elqabasy@gmail.com
 Description: A Linux domain grep tool for regex and plain text domain search.
  A professional Linux tool to grep domains using regex or text patterns.
