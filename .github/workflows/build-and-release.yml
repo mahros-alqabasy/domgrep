@@ -1,0 +1,95 @@
+name: Build and Release .deb Package
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-deb:
+    name: Build Debian Package
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up version from tag
+        id: vars
+        run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y dpkg-dev debhelper fakeroot
+
+      - name: Prepare Package Structure
+        run: |
+          VERSION="${{ steps.vars.outputs.version }}"
+          mkdir -p pkg/DEBIAN
+          mkdir -p pkg/usr/bin
+          mkdir -p pkg/usr/share/man/man1
+          mkdir -p pkg/usr/share/doc/domgrep
+
+          # Inject version into control file
+          sed "s/__VERSION__/$VERSION/" debian/control > pkg/DEBIAN/control
+
+          # Copy executable files
+          cp src/scripts/* pkg/usr/bin/
+          chmod +x pkg/usr/bin/*
+
+          # Compress and copy man pages
+          cp src/man/man1/*.1 pkg/usr/share/man/man1/
+          gzip -f pkg/usr/share/man/man1/*.1
+
+          # Copy documentation
+          cp src/docs/*.md pkg/usr/share/doc/domgrep/
+
+          # Optional post-install script
+          if [ -f debian/postinst ]; then
+            sed "s/__VERSION__/$VERSION/" debian/postinst > pkg/DEBIAN/postinst
+            chmod 755 pkg/DEBIAN/postinst
+          fi
+
+      - name: Build .deb Package
+        run: |
+          dpkg-deb --build pkg domgrep_${{ steps.vars.outputs.version }}.deb
+
+      - name: Upload Debian package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: domgrep-deb
+          path: domgrep_*.deb
+
+  release:
+    name: Create GitHub Release
+    needs: build-deb
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up version from tag
+        id: vars
+        run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Download Debian package artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: domgrep-deb
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: domgrep_${{ steps.vars.outputs.version }}.deb
+          tag_name: v${{ steps.vars.outputs.version }}
+          release_name: "Release v${{ steps.vars.outputs.version }}"
+          body: "New Debian package release: **v${{ steps.vars.outputs.version }}**"
+          draft: false
+          prerelease: false
+          overwrite: true

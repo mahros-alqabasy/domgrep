@@ -1,0 +1,6 @@
+#!/bin/bash
+set -e
+
+echo "Domgrep version __VERSION__ installed successfully." >> /var/log/domgrep-install.log
+
+# Additional post-install tasks go here.

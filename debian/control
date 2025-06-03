@@ -1,3 +1,6 @@
+
+
+
 Source: domgrep
 Section: utils
 Priority: optional
@@ -7,6 +10,7 @@ Standards-Version: 4.5.1
 Homepage: https://github.com/mahros-alqabasy/domgrep
 
 Package: domgrep
+Version: __VERSION__
 Architecture: all
 Depends: ${misc:Depends}
 Description: Lightweight domain search tool using plain text or regex
