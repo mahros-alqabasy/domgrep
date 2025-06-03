@@ -25,7 +25,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt update
-          sudo apt install -y dpkg-dev debhelper fakeroot
+          sudo apt install -y dpkg-dev debhelper fakeroot gzip
 
       - name: Bump version (patch by default)
         run: |
@@ -39,17 +39,36 @@ jobs:
       - name: Prepare Package Structure
         run: |
           mkdir -p pkg/DEBIAN
+          mkdir -p pkg/usr/lib/domgrep
           mkdir -p pkg/usr/bin
           mkdir -p pkg/usr/share/man/man1
           mkdir -p pkg/usr/share/doc/domgrep
 
+          # Control and maintainer scripts
           cp debian/control pkg/DEBIAN/control
-          cp src/*.sh pkg/usr/bin/
-          cp man/domgrep.1 pkg/usr/share/man/man1/
-          gzip -f pkg/usr/share/man/man1/domgrep.1
           cp debian/postinst pkg/DEBIAN/postinst
           chmod 755 pkg/DEBIAN/postinst
+
+          # Shell scripts
+          cp src/*.sh pkg/usr/lib/domgrep/
+
+          # Man page
+          cp man/domgrep.1 pkg/usr/share/man/man1/
+          gzip -9 -f pkg/usr/share/man/man1/domgrep.1
+
+          # Documentation
           cp README.md pkg/usr/share/doc/domgrep/
+          cp debian/changelog pkg/usr/share/doc/domgrep/
+          cp debian/copyright pkg/usr/share/doc/domgrep/
+          gzip -9 -f pkg/usr/share/doc/domgrep/changelog
+
+          # Create domgrep entry point in /usr/bin
+          echo '#!/bin/sh' > pkg/usr/bin/domgrep
+          echo 'exec /usr/lib/domgrep/domgrep.sh "$@"' >> pkg/usr/bin/domgrep
+          chmod +x pkg/usr/bin/domgrep
+
+          # Fix ownership
+          sudo chown -R root:root pkg/
 
       - name: Build .deb package
         run: dpkg-deb --build pkg "domgrep_${{ steps.version.outputs.version }}.deb"
@@ -66,7 +85,7 @@ jobs:
           tag_name: "v${{ steps.version.outputs.version }}"
           release_name: "domgrep v${{ steps.version.outputs.version }}"
           body: "Automated release for domgrep version v${{ steps.version.outputs.version }}"
-          files: "domgrep_${{ steps.version.outputs.version }}.deb"
+          files: "domgrep.deb"
           draft: false
           prerelease: false
           overwrite: true
