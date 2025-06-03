@@ -9,17 +9,19 @@ permissions:
   contents: write
 
 jobs:
-  build-deb:
-    name: Build .deb Package
+  build-and-release:
+    name: Build and Release .deb Package
     runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.version.outputs.version }}
+
+    env:
+      DEB_ARCH: amd64  # Set architecture explicitly
+      PACKAGE_NAME: domgrep
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Set up Git user (required for commit)
+      - name: Set up Git user
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
@@ -38,61 +40,62 @@ jobs:
         id: version
         run: echo "version=$(cat VERSION)" >> $GITHUB_OUTPUT
 
-      - name: Prepare Package Structure
+      # -------------------- Build Step --------------------
+      - name: Prepare package structure
         run: |
           mkdir -p pkg/DEBIAN
-          mkdir -p pkg/usr/lib/domgrep
+          mkdir -p pkg/usr/lib/${{ env.PACKAGE_NAME }}
           mkdir -p pkg/usr/bin
           mkdir -p pkg/usr/share/man/man1
-          mkdir -p pkg/usr/share/doc/domgrep
+          mkdir -p pkg/usr/share/doc/${{ env.PACKAGE_NAME }}
 
+          # Control and postinst
           cp debian/control pkg/DEBIAN/control
           cp debian/postinst pkg/DEBIAN/postinst
           chmod 755 pkg/DEBIAN/postinst
 
-          cp src/*.sh pkg/usr/lib/domgrep/
+          # Shell scripts
+          cp src/*.sh pkg/usr/lib/${{ env.PACKAGE_NAME }}/
 
-          cp man/domgrep.1 pkg/usr/share/man/man1/
-          gzip -9 -f pkg/usr/share/man/man1/domgrep.1
+          # Man page
+          cp man/${{ env.PACKAGE_NAME }}.1 pkg/usr/share/man/man1/
+          gzip -9 -f pkg/usr/share/man/man1/${{ env.PACKAGE_NAME }}.1
 
-          cp README.md pkg/usr/share/doc/domgrep/
-          cp debian/changelog pkg/usr/share/doc/domgrep/
-          cp debian/copyright pkg/usr/share/doc/domgrep/
-          gzip -9 -f pkg/usr/share/doc/domgrep/changelog
+          # Documentation
+          cp README.md pkg/usr/share/doc/${{ env.PACKAGE_NAME }}/
+          cp debian/changelog pkg/usr/share/doc/${{ env.PACKAGE_NAME }}/
+          cp debian/copyright pkg/usr/share/doc/${{ env.PACKAGE_NAME }}/
+          gzip -9 -f pkg/usr/share/doc/${{ env.PACKAGE_NAME }}/changelog
 
-          echo '#!/bin/sh' > pkg/usr/bin/domgrep
-          echo 'exec /usr/lib/domgrep/domgrep.sh "$@"' >> pkg/usr/bin/domgrep
-          chmod +x pkg/usr/bin/domgrep
+          # Entry point
+          echo '#!/bin/sh' > pkg/usr/bin/${{ env.PACKAGE_NAME }}
+          echo "exec /usr/lib/${{ env.PACKAGE_NAME }}/${{ env.PACKAGE_NAME }}.sh \"\$@\"" >> pkg/usr/bin/${{ env.PACKAGE_NAME }}
+          chmod +x pkg/usr/bin/${{ env.PACKAGE_NAME }}
 
+          # Fix ownership
           sudo chown -R root:root pkg/
 
       - name: Build .deb package
-        run: dpkg-deb --build pkg "domgrep_${{ steps.version.outputs.version }}.deb"
+        run: |
+          export DEB_VERSION=${{ steps.version.outputs.version }}
+          export DEB_FILE="${{ env.PACKAGE_NAME }}_${DEB_VERSION}_${{ env.DEB_ARCH }}.deb"
+          dpkg-deb --build pkg "$DEB_FILE"
+          echo "deb_file=$DEB_FILE" >> $GITHUB_ENV
 
       - name: Upload .deb artifact
         uses: actions/upload-artifact@v4
         with:
           name: domgrep-deb
-          path: "domgrep_${{ steps.version.outputs.version }}.deb"
+          path: ${{ env.deb_file }}
 
-  release:
-    name: Release GitHub Package
-    needs: build-deb
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Download .deb artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: domgrep-deb
-
+      # -------------------- Release Step --------------------
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: "v${{ needs.build-deb.outputs.version }}"
-          release_name: "domgrep v${{ needs.build-deb.outputs.version }}"
-          body: "Automated release for domgrep version v${{ needs.build-deb.outputs.version }}"
-          files: "domgrep_${{ needs.build-deb.outputs.version }}.deb"
+          tag_name: "v${{ steps.version.outputs.version }}"
+          release_name: "domgrep v${{ steps.version.outputs.version }}"
+          body: "Automated release for domgrep version v${{ steps.version.outputs.version }}"
+          files: "${{ env.deb_file }}"
           draft: false
           prerelease: false
           overwrite: true
