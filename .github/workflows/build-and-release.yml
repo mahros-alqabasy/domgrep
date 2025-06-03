@@ -3,7 +3,7 @@ name: Build and Release .deb Package
 on:
   push:
     tags:
-      - 'v*.*.*'
+      - "v*.*.*"
   workflow_dispatch:
 
 permissions:
@@ -15,55 +15,55 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout Repository
         uses: actions/checkout@v3
 
-      - name: Set up version from tag
-        id: vars
-        run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+      - name: Extract version from tag
+        id: get_version
+        run: |
+          echo "TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+          echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_ENV
 
       - name: Install dependencies
         run: |
           sudo apt update
-          sudo apt install -y dpkg-dev debhelper fakeroot
+          sudo apt install -y dpkg-dev debhelper fakeroot gzip
 
       - name: Prepare Package Structure
         run: |
-          VERSION="${{ steps.vars.outputs.version }}"
           mkdir -p pkg/DEBIAN
           mkdir -p pkg/usr/bin
           mkdir -p pkg/usr/share/man/man1
           mkdir -p pkg/usr/share/doc/domgrep
 
-          # Inject version into control file
-          sed "s/__VERSION__/$VERSION/" debian/control > pkg/DEBIAN/control
+          # Copy control and postinst files
+          cp debian/control pkg/DEBIAN/control
+          cp debian/postinst pkg/DEBIAN/postinst
+          chmod 755 pkg/DEBIAN/postinst
 
-          # Copy executable files
-          cp src/scripts/* pkg/usr/bin/
-          chmod +x pkg/usr/bin/*
+          # Copy scripts to /usr/bin
+          cp src/*.sh pkg/usr/bin/
+          chmod +x pkg/usr/bin/*.sh
 
-          # Compress and copy man pages
-          cp src/man/man1/*.1 pkg/usr/share/man/man1/
-          gzip -f pkg/usr/share/man/man1/*.1
+          # Rename domgrep.sh to domgrep as main executable
+          mv pkg/usr/bin/domgrep.sh pkg/usr/bin/domgrep
 
-          # Copy documentation
-          cp src/docs/*.md pkg/usr/share/doc/domgrep/
+          # Copy man page and compress it
+          cp man/domgrep.1 pkg/usr/share/man/man1/
+          gzip -f pkg/usr/share/man/man1/domgrep.1
 
-          # Optional post-install script
-          if [ -f debian/postinst ]; then
-            sed "s/__VERSION__/$VERSION/" debian/postinst > pkg/DEBIAN/postinst
-            chmod 755 pkg/DEBIAN/postinst
-          fi
+          # Copy README or docs
+          cp README.md pkg/usr/share/doc/domgrep/README.md
 
-      - name: Build .deb Package
+      - name: Build .deb package
         run: |
-          dpkg-deb --build pkg domgrep_${{ steps.vars.outputs.version }}.deb
+          dpkg-deb --build pkg domgrep_${{ env.VERSION }}.deb
 
       - name: Upload Debian package artifact
         uses: actions/upload-artifact@v4
         with:
           name: domgrep-deb
-          path: domgrep_*.deb
+          path: domgrep_${{ env.VERSION }}.deb
 
   release:
     name: Create GitHub Release
@@ -74,9 +74,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Set up version from tag
-        id: vars
-        run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+      - name: Extract version from tag
+        run: |
+          echo "TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+          echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_ENV
 
       - name: Download Debian package artifact
         uses: actions/download-artifact@v4
@@ -86,10 +87,10 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
-          files: domgrep_${{ steps.vars.outputs.version }}.deb
-          tag_name: v${{ steps.vars.outputs.version }}
-          release_name: "Release v${{ steps.vars.outputs.version }}"
-          body: "New Debian package release: **v${{ steps.vars.outputs.version }}**"
+          tag_name: ${{ env.TAG }}
+          name: "Release ${{ env.TAG }}"
+          files: domgrep_${{ env.VERSION }}.deb
+          body: "New release of domgrep CLI tool: version ${{ env.VERSION }}"
           draft: false
           prerelease: false
           overwrite: true
